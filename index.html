@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spending Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <h1>Spending Tracker</h1>
+      <button class="theme-toggle" id="themeToggle" title="Toggle dark/light mode">◑</button>
+    </header>
+
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="upload">Upload</button>
+      <button class="tab-btn" data-tab="monthly">Monthly</button>
+      <button class="tab-btn" data-tab="yearly">Yearly</button>
+    </nav>
+
+    <!-- Upload Tab -->
+    <section class="tab-panel active" id="tab-upload">
+      <div class="upload-zone" id="uploadZone">
+        <div class="upload-icon">📂</div>
+        <p class="upload-title">Drop your bank CSV here</p>
+        <p class="upload-sub">or <label class="file-label" for="fileInput">browse files</label></p>
+        <input type="file" id="fileInput" accept=".csv,.tsv,.pdf" hidden multiple />
+        <p class="upload-formats">CSV/TSV: Monzo · HSBC · Halifax · Amex · Generic</p>
+        <p class="upload-formats">PDF statements: HSBC · Halifax · Barclays · Lloyds · NatWest · Nationwide · Santander · Amex</p>
+      </div>
+
+      <div id="uploadStatus" class="upload-status hidden"></div>
+
+      <!-- Generic column mapper (shown when format unknown) -->
+      <div id="columnMapper" class="column-mapper hidden">
+        <h3>Map columns</h3>
+        <p>We couldn't auto-detect your bank. Please map the required fields:</p>
+        <div class="mapper-grid" id="mapperGrid"></div>
+        <button class="btn btn-primary" id="applyMapping">Import with this mapping</button>
+      </div>
+
+      <div id="dataOverview" class="data-overview hidden">
+        <div class="overview-header">
+          <h3 id="overviewTitle">Loaded data</h3>
+          <button class="btn btn-danger" id="clearDataBtn">Clear all data</button>
+        </div>
+        <div id="overviewStats" class="overview-stats"></div>
+        <div id="bankBadges" class="bank-badges"></div>
+      </div>
+    </section>
+
+    <!-- Monthly Tab -->
+    <section class="tab-panel" id="tab-monthly">
+      <div class="monthly-controls">
+        <select id="monthSelect" class="select-input"></select>
+        <div class="income-row">
+          <label for="incomeInput">Monthly income (£)</label>
+          <input type="number" id="incomeInput" class="income-input" placeholder="0" min="0" step="0.01" />
+        </div>
+      </div>
+
+      <div class="summary-cards" id="summaryCards">
+        <div class="card">
+          <div class="card-label">Total Income</div>
+          <div class="card-value" id="cardIncome">£0</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Total Spent</div>
+          <div class="card-value spend" id="cardSpent">£0</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Net Savings</div>
+          <div class="card-value" id="cardSavings">£0</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Savings Rate</div>
+          <div class="card-value" id="cardRate">0%</div>
+        </div>
+      </div>
+
+      <div class="monthly-body">
+        <div class="chart-panel">
+          <h3>Spending by category</h3>
+          <div class="chart-container">
+            <canvas id="donutChart"></canvas>
+          </div>
+          <div id="chartLegend" class="chart-legend"></div>
+        </div>
+
+        <div class="transactions-panel">
+          <div class="transactions-header">
+            <h3>Transactions</h3>
+            <button class="btn btn-sm" id="addCategoryBtn">+ Category</button>
+          </div>
+          <div id="transactionList" class="transaction-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Yearly Tab -->
+    <section class="tab-panel" id="tab-yearly">
+      <div class="yearly-controls">
+        <select id="yearSelect" class="select-input"></select>
+      </div>
+      <div id="yearlyGrid" class="yearly-grid-wrapper"></div>
+    </section>
+  </div>
+
+  <!-- Add Category Modal -->
+  <div class="modal-overlay hidden" id="categoryModal">
+    <div class="modal">
+      <h3>Add custom category</h3>
+      <input type="text" id="newCategoryInput" class="text-input" placeholder="e.g. Side Hustle" />
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="cancelCategoryBtn">Cancel</button>
+        <button class="btn btn-primary" id="saveCategoryBtn">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
