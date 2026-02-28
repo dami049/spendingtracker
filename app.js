@@ -1215,7 +1215,10 @@ function init() {
     const files = Array.from(e.dataTransfer.files).filter(f => /\.(csv|tsv|pdf)$/i.test(f.name));
     files.forEach(handleFileUpload);
   });
-  zone.addEventListener('click', () => document.getElementById('fileInput').click());
+  zone.addEventListener('click', e => {
+    if (e.target.closest('label') || e.target.id === 'fileInput') return;
+    document.getElementById('fileInput').click();
+  });
 
   // File picker
   document.getElementById('fileInput').addEventListener('change', e => {
