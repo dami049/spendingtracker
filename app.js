@@ -408,11 +408,16 @@ function extractAmountsFromLine(text) {
 }
 
 const SKIP_LINE_RE = /^(page\s+\d|sort\s+code|account\s+(number|no\.?)|balance\s+brought\s+forward|opening\s+balance|closing\s+balance|total\s+(debit|credit)|statement\s+period|date\s+description|transaction\s+date|previous\s+balance|brought\s+forward|available\s+balance)/i;
+// Catches "BALANCE BROUGHT/CARRIED FORWARD" even when prefixed by a date
+const SKIP_CONTENT_RE = /balance\s+(brought|carried)\s+forward|opening\s+balance|closing\s+balance/i;
 
 const INCOME_KEYWORDS_RE = /salary|wages|bacs\s+credit|direct\s+credit|employer|refund|cashback|interest\s+paid|credit\s+interest|dividend|payment\s+received|transfer\s+in/i;
+// HSBC/Halifax payment-type prefix codes that indicate a credit
+const CREDIT_TYPE_CODE_RE = /^(CR|CREDIT)\s/i;
 
 function applyBankSign(value, bank, description) {
   if (INCOME_KEYWORDS_RE.test(description)) return Math.abs(value);
+  if (CREDIT_TYPE_CODE_RE.test(description)) return Math.abs(value);
   if (bank === 'amex') return -Math.abs(value);
   return -Math.abs(value); // default: expense
 }
@@ -465,9 +470,10 @@ function parsePDFTransactions(lines, bank) {
   const transactions = [];
   let pending = null;
   let prevBalance = null;
+  let lastDate = null;
 
   const flush = () => {
-    if (!pending) return;
+    if (!pending || !pending.amounts.length) { pending = null; return; }
     const tx = finalisePDFTx(pending, bank, prevBalance);
     if (tx) transactions.push(tx);
     if (pending.amounts.length >= 2) {
@@ -478,19 +484,41 @@ function parsePDFTransactions(lines, bank) {
 
   for (const { text } of lines) {
     const t = text.trim();
-    if (!t || SKIP_LINE_RE.test(t)) continue;
+    if (!t || SKIP_LINE_RE.test(t) || SKIP_CONTENT_RE.test(t)) continue;
 
     const dateResult = parseDateAtStart(t);
     const amounts = extractAmountsFromLine(text);
 
-    if (dateResult && amounts.length > 0) {
+    if (dateResult) {
       flush();
-      const desc = text.slice(dateResult.end, amounts[0].index).trim();
-      pending = { date: dateResult.date, description: desc, amounts, rawText: text };
-    } else if (dateResult) {
-      // Date with no amounts = header date-range line — skip
-    } else if (!dateResult && pending && amounts.length === 0 && t.length > 1) {
-      // Continuation line: append to description
+      lastDate = dateResult.date;
+      if (amounts.length > 0) {
+        // Date + amounts on same line — complete single-line transaction
+        const desc = text.slice(dateResult.end, amounts[0].index).trim();
+        pending = { date: dateResult.date, description: desc, amounts, rawText: text };
+      } else {
+        // Date only — amounts will arrive on the next continuation line
+        const desc = text.slice(dateResult.end).trim();
+        pending = { date: dateResult.date, description: desc, amounts: [], rawText: text };
+      }
+    } else if (amounts.length > 0) {
+      if (pending && !pending.amounts.length) {
+        // This is the amount line for a date-only pending (e.g. HSBC multi-line rows)
+        const descFragment = text.slice(0, amounts[0].index).trim();
+        if (descFragment) pending.description += ' ' + descFragment;
+        pending.amounts = amounts;
+        pending.rawText += ' ' + text;
+      } else {
+        // Either: pending already has amounts (sub-transaction on same date, e.g. HSBC CR line)
+        // or no pending at all — flush and start a new entry reusing lastDate
+        flush();
+        if (lastDate) {
+          const descFragment = text.slice(0, amounts[0].index).trim();
+          pending = { date: lastDate, description: descFragment, amounts, rawText: text };
+        }
+      }
+    } else if (pending && t.length > 1) {
+      // Pure text continuation — append to description
       pending.description += ' ' + t;
     }
   }
